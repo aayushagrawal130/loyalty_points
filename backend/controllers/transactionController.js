@@ -104,16 +104,66 @@ const redeemPoints = async (req, res) => {
 };
 
 // Get transactions
+// Get transactions with search, pagination and sorting
 const getTransactions = async (req, res) => {
     try {
-        const transactions = await Transaction.find({
+        const {
+            page = 1,
+            limit = 10,
+            search = "",
+            sortBy = "createdAt",
+            order = "desc"
+        } = req.query;
+
+        const pageNumber = Math.max(Number(page), 1);
+        const limitNumber = Math.min(Math.max(Number(limit), 1), 100);
+
+        const allowedSortFields = [
+            "createdAt",
+            "points",
+            "type",
+            "description"
+        ];
+
+        const sortField = allowedSortFields.includes(sortBy)
+            ? sortBy
+            : "createdAt";
+
+        const sortOrder = order === "asc" ? 1 : -1;
+
+        const filter = {
             user: req.user.userId
-        }).sort({ createdAt: -1 });
+        };
+
+        // Search by description
+        if (search.trim()) {
+            filter.description = {
+                $regex: search.trim(),
+                $options: "i"
+            };
+        }
+
+        // Total matching transactions
+        const total = await Transaction.countDocuments(filter);
+
+        // Get transactions
+        const transactions = await Transaction.find(filter)
+            .sort({ [sortField]: sortOrder })
+            .skip((pageNumber - 1) * limitNumber)
+            .limit(limitNumber);
 
         res.json({
             count: transactions.length,
+            total,
+            page: pageNumber,
+            limit: limitNumber,
+            totalPages: Math.ceil(total / limitNumber),
+            sortBy: sortField,
+            order: order === "asc" ? "asc" : "desc",
+            search,
             transactions
         });
+
     } catch (error) {
         res.status(500).json({
             message: "Server error",
