@@ -221,6 +221,103 @@ const checkOut = async (req, res) => {
   }
 };
 
+// Get parking sessions with pagination and sorting
+const getSessions = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit) || 10, 1),
+      100
+    );
+
+    const sortBy = req.query.sortBy || "createdAt";
+    const order = req.query.order === "asc" ? 1 : -1;
+
+    const allowedSortFields = [
+      "createdAt",
+      "entryTime",
+      "exitTime",
+      "fee",
+      "plateNumber",
+      "status",
+    ];
+
+    if (!allowedSortFields.includes(sortBy)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid sort field",
+      });
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [sessions, total] = await Promise.all([
+      ParkingSession.find()
+        .populate("spot")
+        .sort({ [sortBy]: order })
+        .skip(skip)
+        .limit(limit),
+
+      ParkingSession.countDocuments(),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      sessions,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch parking sessions",
+      error: error.message,
+    });
+  }
+};
+
+
+// Search parking sessions by plate number
+const searchSessions = async (req, res) => {
+  try {
+    const { plate } = req.query;
+
+    if (!plate || !plate.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Plate number is required",
+      });
+    }
+
+    const normalizedPlate = plate.trim().toUpperCase();
+
+    const sessions = await ParkingSession.find({
+      plateNumber: {
+        $regex: normalizedPlate,
+        $options: "i",
+      },
+    })
+      .populate("spot")
+      .sort({ entryTime: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: sessions.length,
+      sessions,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to search parking sessions",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   checkIn,
   checkOut,
