@@ -20,6 +20,10 @@ const authRoutes = require("./routes/authRoutes");
 
 app.use("/api/auth", authRoutes);
 
+const transactionRoutes = require("./routes/transactionRoutes");
+
+app.use("/api/transactions", transactionRoutes);
+
 // Health check
 app.get("/", (req, res) => {
     res.json({
@@ -30,5 +34,5 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
